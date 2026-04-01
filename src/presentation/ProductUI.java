@@ -9,6 +9,7 @@ import utils.FormatUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 public class ProductUI {
@@ -16,7 +17,7 @@ public class ProductUI {
     private static final CategoryService categoryService = new CategoryService();
     private static final Scanner sc = new Scanner(System.in);
 
-    private static final int PAGE_SIZE = 10;   // ←←← THÊM DÒNG NÀY (quan trọng nhất)
+    private static final int PAGE_SIZE = 5;
 
     // Cache danh mục
     private static Map<Integer, String> categoryMap = null;
@@ -37,7 +38,7 @@ public class ProductUI {
 
                 switch (choice) {
                     case 1 -> add();
-                    case 2 -> show(service.getAll());
+                    case 2 -> showAllWithSort();
                     case 3 -> search();
                     case 4 -> searchByCategory();
                     case 5 -> update();
@@ -54,7 +55,7 @@ public class ProductUI {
         }
     }
 
-    // ================= LOAD CATEGORY MAP =================
+    // ================= LOAD CATEGORY =================
     private static void loadCategoryMap() {
         if (categoryMap == null) {
             List<Category> categories = categoryService.getAll();
@@ -66,6 +67,61 @@ public class ProductUI {
     private static String getCategoryName(int categoryId) {
         loadCategoryMap();
         return categoryMap.getOrDefault(categoryId, "Không xác định");
+    }
+
+    // ================= SẮP XẾP & HIỂN THỊ =================
+    private static void showAllWithSort() {
+        List<Product> products = service.getAll();
+        showWithSortAndPagination(products, "DANH SÁCH TẤT CẢ SẢN PHẨM");
+    }
+
+    private static void showWithSortAndPagination(List<Product> products, String title) {
+        if (products.isEmpty()) {
+            System.out.println("❌ Không có dữ liệu.");
+            return;
+        }
+
+        while (true) {
+            System.out.println("\n===== " + title + " =====");
+            System.out.println("Chọn cách sắp xếp:");
+            System.out.println("1. ID tăng dần          2. ID giảm dần");
+            System.out.println("3. Tên A → Z            4. Tên Z → A");
+            System.out.println("5. Giá tăng dần         6. Giá giảm dần");
+            System.out.println("7. Stock tăng dần       8. Stock giảm dần");
+            System.out.println("0. Thoát");
+
+            System.out.print("Nhập lựa chọn: ");
+            try {
+                int sortChoice = Integer.parseInt(sc.nextLine().trim());
+                if (sortChoice == 0) return;
+
+                List<Product> sortedProducts = sortProducts(products, sortChoice);
+                showPaginated(sortedProducts, title + " (Đã sắp xếp)");
+
+                // Sau khi xem phân trang, hỏi có muốn sắp xếp lại không
+                System.out.print("\nBạn có muốn sắp xếp lại theo tiêu chí khác không? (1: Có - 0: Không): ");
+                if (Integer.parseInt(sc.nextLine().trim()) != 1) {
+                    return;
+                }
+            } catch (Exception e) {
+                System.out.println("❌ Vui lòng nhập số hợp lệ!");
+            }
+        }
+    }
+
+    private static List<Product> sortProducts(List<Product> products, int choice) {
+        Comparator<Product> comparator = switch (choice) {
+            case 1 -> Comparator.comparingInt(Product::getId);
+            case 2 -> Comparator.comparingInt(Product::getId).reversed();
+            case 3 -> Comparator.comparing(p -> p.getName() != null ? p.getName().toLowerCase() : "");
+            case 4 -> Comparator.comparing((Product p) -> p.getName() != null ? p.getName().toLowerCase() : "").reversed();
+            case 5 -> Comparator.comparingDouble(Product::getPrice);
+            case 6 -> Comparator.comparingDouble(Product::getPrice).reversed();
+            case 7 -> Comparator.comparingInt(Product::getStock);
+            case 8 -> Comparator.comparingInt(Product::getStock).reversed();
+            default -> Comparator.comparingInt(Product::getId);
+        };
+        return products.stream().sorted(comparator).collect(Collectors.toList());
     }
 
     // ================= PHÂN TRANG =================
@@ -82,14 +138,14 @@ public class ProductUI {
         while (true) {
             int fromIndex = (currentPage - 1) * PAGE_SIZE;
             int toIndex = Math.min(fromIndex + PAGE_SIZE, totalProducts);
-            List<Product> currentPageList = allProducts.subList(fromIndex, toIndex);
+            List<Product> pageList = allProducts.subList(fromIndex, toIndex);
 
             System.out.println("\n===== " + title + " =====");
             System.out.printf("Trang %d / %d  |  Tổng sản phẩm: %d%n", currentPage, totalPages, totalProducts);
-            System.out.println("=".repeat(100));
+            System.out.println("=".repeat(110));
 
             printTableHeader();
-            for (Product p : currentPageList) {
+            for (Product p : pageList) {
                 printTableRow(p);
             }
             printTableSeparator();
@@ -99,32 +155,22 @@ public class ProductUI {
 
             try {
                 int action = Integer.parseInt(sc.nextLine().trim());
-
                 switch (action) {
                     case 1 -> {
                         if (currentPage > 1) currentPage--;
-                        else System.out.println("❌ Bạn đang ở trang đầu tiên!");
+                        else System.out.println("❌ Đang ở trang đầu tiên!");
                     }
                     case 2 -> {
                         if (currentPage < totalPages) currentPage++;
-                        else System.out.println("❌ Bạn đang ở trang cuối cùng!");
+                        else System.out.println("❌ Đang ở trang cuối cùng!");
                     }
                     case 3 -> {
                         System.out.print("Nhập số trang (1-" + totalPages + "): ");
-                        try {
-                            int chosen = Integer.parseInt(sc.nextLine().trim());
-                            if (chosen >= 1 && chosen <= totalPages) {
-                                currentPage = chosen;
-                            } else {
-                                System.out.println("❌ Số trang không hợp lệ!");
-                            }
-                        } catch (Exception e) {
-                            System.out.println("❌ Vui lòng nhập số!");
-                        }
+                        int page = Integer.parseInt(sc.nextLine().trim());
+                        if (page >= 1 && page <= totalPages) currentPage = page;
+                        else System.out.println("❌ Số trang không hợp lệ!");
                     }
-                    case 0 -> {
-                        return;
-                    }
+                    case 0 -> { return; }
                     default -> System.out.println("❌ Lựa chọn không hợp lệ!");
                 }
             } catch (Exception e) {
@@ -133,12 +179,7 @@ public class ProductUI {
         }
     }
 
-    // ================= SHOW =================
-    private static void show(List<Product> list) {
-        showPaginated(list, "DANH SÁCH SẢN PHẨM");
-    }
-
-    // ================= IN BẢNG =================
+    // ================= BẢNG HIỂN THỊ =================
     private static void printTableHeader() {
         printTableSeparator();
         System.out.printf("| %-5s | %-25s | %-18s | %-12s | %-17s | %17s | %8s | %-25s |%n",
@@ -216,7 +257,6 @@ public class ProductUI {
             } else {
                 System.out.println("❌ Thêm sản phẩm thất bại!");
             }
-
         } catch (Exception e) {
             System.out.println("❌ Lỗi nhập dữ liệu! Vui lòng kiểm tra lại thông tin.");
         }
@@ -228,7 +268,7 @@ public class ProductUI {
             System.out.print("Nhập tên sản phẩm cần tìm: ");
             String keyword = sc.nextLine().trim();
             List<Product> result = service.search(keyword);
-            showPaginated(result, "KẾT QUẢ TÌM KIẾM: " + keyword.toUpperCase());
+            showWithSortAndPagination(result, "KẾT QUẢ TÌM KIẾM: " + keyword.toUpperCase());
         } catch (Exception e) {
             System.out.println("❌ Có lỗi xảy ra khi tìm kiếm.");
         }
@@ -239,7 +279,7 @@ public class ProductUI {
             int categoryId = chooseCategory();
             List<Product> result = service.getByCategory(categoryId);
             String categoryName = getCategoryName(categoryId);
-            showPaginated(result, "SẢN PHẨM THUỘC DANH MỤC: " + categoryName);
+            showWithSortAndPagination(result, "SẢN PHẨM THUỘC DANH MỤC: " + categoryName);
         } catch (Exception e) {
             System.out.println("❌ Có lỗi xảy ra khi tìm theo danh mục.");
         }
@@ -310,7 +350,6 @@ public class ProductUI {
             } else {
                 System.out.println("ℹ️  Đã hủy cập nhật.");
             }
-
         } catch (Exception e) {
             System.out.println("❌ Lỗi nhập liệu! Vui lòng kiểm tra lại dữ liệu.");
         }
@@ -346,7 +385,6 @@ public class ProductUI {
             } else {
                 System.out.println("ℹ️  Đã hủy thao tác xóa.");
             }
-
         } catch (Exception e) {
             System.out.println("❌ Lỗi nhập liệu! Vui lòng nhập ID là số.");
         }
@@ -369,17 +407,14 @@ public class ProductUI {
     // ================= CHOOSE CATEGORY =================
     private static int chooseCategory() {
         List<Category> list = categoryService.getAll();
-
         while (true) {
             try {
                 System.out.println("\n===== DANH MỤC =====");
                 for (Category c : list) {
                     System.out.println(c.getId() + ". " + c.getName());
                 }
-
                 System.out.print("Chọn category ID: ");
                 int categoryId = Integer.parseInt(sc.nextLine().trim());
-
                 if (list.stream().anyMatch(c -> c.getId() == categoryId)) {
                     return categoryId;
                 } else {
@@ -389,5 +424,15 @@ public class ProductUI {
                 System.out.println("❌ Vui lòng nhập số hợp lệ!");
             }
         }
+    }
+
+    // ================= SHOW (dùng cho update/delete) =================
+    private static void show(List<Product> list) {
+        if (list.isEmpty()) return;
+        printTableHeader();
+        for (Product p : list) {
+            printTableRow(p);
+        }
+        printTableSeparator();
     }
 }

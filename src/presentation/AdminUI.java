@@ -24,7 +24,7 @@ public class AdminUI {
                     ProductUI.menu();
                     break;
                 case 3:
-                    System.out.println("Order Management...");
+                    AdminOrderUI.manageOrders();
                     break;
                 case 0:
                     return;

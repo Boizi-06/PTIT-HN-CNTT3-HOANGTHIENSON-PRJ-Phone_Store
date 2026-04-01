@@ -6,15 +6,16 @@ import entity.Product;
 import java.util.List;
 
 public class ProductService {
-    private ProductDAO dao = new ProductDAO();
+
+    private final ProductDAO dao = new ProductDAO();
 
     public boolean add(Product p) {
         if (p.getName() == null || p.getName().isEmpty()) {
-            System.out.println("❌ Tên không được rỗng");
+            System.out.println("❌ Tên sản phẩm không được rỗng");
             return false;
         }
         if (p.getPrice() <= 0) {
-            System.out.println("❌ Giá phải > 0");
+            System.out.println("❌ Giá sản phẩm phải lớn hơn 0");
             return false;
         }
         return dao.add(p);
@@ -22,6 +23,13 @@ public class ProductService {
 
     public List<Product> getAll() {
         return dao.getAll();
+    }
+
+    /**
+     * Lấy danh sách sản phẩm còn hàng (stock > 0)
+     */
+    public List<Product> getAvailableProducts() {
+        return dao.getAvailableProducts();   // Giả sử bạn đã có phương thức này trong ProductDAO
     }
 
     public List<Product> search(String keyword) {

@@ -159,4 +159,33 @@ public class ProductDAO {
         }
         return 0;
     }
+    // ================= SỬA LẠI METHOD NÀY =================
+    public List<Product> getAvailableProducts() {
+        List<Product> list = new ArrayList<>();
+        String sql = "SELECT p.*, c.name as category_name " +
+                "FROM products p LEFT JOIN categories c ON p.category_id = c.id " +
+                "WHERE p.stock > 0 ORDER BY p.id ASC";
+
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                Product p = new Product();
+                p.setId(rs.getInt("id"));
+                p.setName(rs.getString("name"));
+                p.setCategoryId(rs.getInt("category_id"));
+                p.setStorage(rs.getString("storage"));
+                p.setColor(rs.getString("color"));
+                p.setPrice(rs.getDouble("price"));
+                p.setStock(rs.getInt("stock"));
+                p.setDescription(rs.getString("description"));
+                list.add(p);
+            }
+        } catch (Exception e) {   // ← Sửa thành Exception để bao quát hết
+            System.err.println("❌ Lỗi khi lấy danh sách sản phẩm còn hàng: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return list;
+    }
 }
