@@ -84,7 +84,7 @@ public class ProductCustomerUI {
         clearScreen();
         printHeader("🔍 TÌM KIẾM THEO TÊN");
 
-        String keyword = InputUtil.inputString(sc, YELLOW + "Nhập tên sản phẩm: " + RESET);
+        String keyword = InputUtil.inputName(sc, YELLOW + "Nhập tên sản phẩm: " + RESET);
         List<Product> result = allProducts.stream()
                 .filter(p -> p.getName() != null && p.getName().toLowerCase().contains(keyword.toLowerCase()))
                 .collect(Collectors.toList());

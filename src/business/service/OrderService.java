@@ -5,6 +5,7 @@ import business.dao.OrderDetailDAO;
 import entity.CartItem;
 import entity.Order;
 import entity.OrderDetail;
+import entity.TopSellingProduct;
 import utils.DBConnection;
 
 import java.sql.Connection;
@@ -24,15 +25,15 @@ public class OrderService {
             conn.setAutoCommit(false);
 
             double total = items.stream().mapToDouble(CartItem::getSubtotal).sum();
-
             int orderId = orderDAO.createOrder(conn, userId, total);
+
             if (orderId == -1) throw new Exception("Tạo order thất bại");
 
             for (CartItem item : items) {
-                detailDAO.addDetail(conn, orderId, item.getProductId(),
-                        item.getQuantity(), item.getPrice());
+                detailDAO.addDetail(conn, orderId, item.getProductId(), item.getQuantity(), item.getPrice());
             }
 
+            // Xóa khỏi giỏ hàng
             String deleteSql = "DELETE FROM cart_items WHERE id = ?";
             for (CartItem item : items) {
                 try (var ps = conn.prepareStatement(deleteSql)) {
@@ -43,7 +44,6 @@ public class OrderService {
 
             conn.commit();
             return true;
-
         } catch (Exception e) {
             rollback(conn);
             System.out.println("❌ Lỗi tạo đơn hàng: " + e.getMessage());
@@ -75,7 +75,6 @@ public class OrderService {
             conn.setAutoCommit(false);
 
             boolean success = orderDAO.updateOrderStatus(conn, orderId, newStatus);
-
             if (success && "CANCELLED".equals(newStatus)) {
                 orderDAO.restoreStockForOrder(conn, orderId);
             }
@@ -120,10 +119,14 @@ public class OrderService {
         return orderDAO.getAllOrders();
     }
 
-    /**
-     * LẤY ĐẦY ĐỦ THÔNG TIN ĐƠN HÀNG (customerName + orderDetails)
-     * Dùng cho chức năng cập nhật trạng thái
-     */
+    public List<Order> getAllOrdersWithDetails() {
+        List<Order> orders = orderDAO.getAllOrders();
+        for (Order order : orders) {
+            order.setOrderDetails(orderDAO.getOrderDetails(order.getId()));
+        }
+        return orders;
+    }
+
     public Order getFullOrderById(int orderId) {
         List<Order> allOrders = orderDAO.getAllOrders();
         Order order = allOrders.stream()
@@ -132,31 +135,48 @@ public class OrderService {
                 .orElse(null);
 
         if (order != null) {
-            List<OrderDetail> details = orderDAO.getOrderDetails(orderId);
-            order.setOrderDetails(details);
+            order.setOrderDetails(orderDAO.getOrderDetails(orderId));
         }
         return order;
+    }
+
+    // ==================== THỐNG KÊ DOANH THU & TOP SẢN PHẨM ====================
+
+    /**
+     * Tổng doanh thu từ tất cả đơn hàng (chỉ tính các đơn đã DELIVERED)
+     */
+    public double getTotalRevenue() {
+        return orderDAO.getTotalRevenue();
+    }
+
+    /**
+     * Lấy Top 5 sản phẩm bán chạy nhất (theo số lượng bán được)
+     */
+    public List<TopSellingProduct> getTopSellingProducts(int limit) {
+        return orderDAO.getTopSellingProducts(limit);
+    }
+
+    /**
+     * Lấy số lượng đã bán của một sản phẩm cụ thể
+     */
+    public long getQuantitySold(int productId) {
+        return orderDAO.getQuantitySold(productId);
     }
 
     // ==================== HỖ TRỢ TRANSACTION ====================
     private void rollback(Connection conn) {
         if (conn != null) {
-            try { conn.rollback(); } catch (SQLException ignored) {}
+            try {
+                conn.rollback();
+            } catch (SQLException ignored) {}
         }
     }
 
     private void closeConnection(Connection conn) {
         if (conn != null) {
-            try { conn.close(); } catch (SQLException ignored) {}
+            try {
+                conn.close();
+            } catch (SQLException ignored) {}
         }
-    }
-    // Load chi tiết sản phẩm cho danh sách đơn hàng (dùng cho viewAllOrders)
-    public List<Order> getAllOrdersWithDetails() {
-        List<Order> orders = orderDAO.getAllOrders();
-        for (Order order : orders) {
-            List<OrderDetail> details = orderDAO.getOrderDetails(order.getId());
-            order.setOrderDetails(details);
-        }
-        return orders;
     }
 }

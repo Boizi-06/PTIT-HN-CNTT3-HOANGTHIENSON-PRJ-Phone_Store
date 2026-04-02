@@ -5,7 +5,7 @@ import entity.Category;
 import business.service.ProductService;
 import business.service.CategoryService;
 import utils.FormatUtil;
-import utils.InputUtil;   // ← Giả sử bạn có lớp này như ở CategoryUI
+import utils.InputUtil;
 
 import java.util.List;
 import java.util.Map;
@@ -94,7 +94,6 @@ public class ProductUI {
         return categoryMap.getOrDefault(categoryId, "Không xác định");
     }
 
-    // ================= HEADER =================
     private static void printHeader(String title) {
         System.out.println(BOLD + PURPLE + "╔════════════════════════════════════════════════════════════╗" + RESET);
         System.out.println(BOLD + PURPLE + "║" + RESET + "              " + BOLD + YELLOW + title + RESET + "                       " + BOLD + PURPLE + "║" + RESET);
@@ -129,7 +128,7 @@ public class ProductUI {
             if (sortChoice == 0) return;
 
             List<Product> sortedProducts = sortProducts(products, sortChoice);
-            showPaginated(sortedProducts, title + " (Đã sắp xếp)");
+            showPaginated(sortedProducts, title);
 
             System.out.print("\n" + YELLOW + "Bạn có muốn sắp xếp lại theo tiêu chí khác không? (1: Có - 0: Không): " + RESET);
             if (InputUtil.inputInt(sc, "", 0, 1) != 1) return;
@@ -152,10 +151,7 @@ public class ProductUI {
     }
 
     private static void showPaginated(List<Product> allProducts, String title) {
-        if (allProducts.isEmpty()) {
-            System.out.println(YELLOW + "⚠️  Không có dữ liệu." + RESET);
-            return;
-        }
+        if (allProducts.isEmpty()) return;
 
         int total = allProducts.size();
         int totalPages = (int) Math.ceil((double) total / PAGE_SIZE);
@@ -169,7 +165,8 @@ public class ProductUI {
             int to = Math.min(from + PAGE_SIZE, total);
             List<Product> pageList = allProducts.subList(from, to);
 
-            System.out.printf(BOLD + BLUE + "Trang %d / %d   |   Tổng: %d sản phẩm%n" + RESET, currentPage, totalPages, total);
+            System.out.printf(BOLD + BLUE + "Trang %d / %d   |   Tổng: %d sản phẩm%n" + RESET,
+                    currentPage, totalPages, total);
             System.out.println("═".repeat(110));
 
             printTableHeader();
@@ -193,7 +190,7 @@ public class ProductUI {
         }
     }
 
-    // ================= BẢNG HIỂN THỊ ĐẸP =================
+    // ================= BẢNG HIỂN THỊ =================
     private static void printTableSeparator() {
         System.out.println(BOLD + BLUE + "+-------+---------------------------+--------------------+--------------+-------------------+-------------------+----------+---------------------------+" + RESET);
     }
@@ -228,7 +225,7 @@ public class ProductUI {
     // ================= ADD =================
     private static void add() {
         clearScreen();
-        printHeader("➕ THÊM SẢN PHẨM MỚI    ");
+        printHeader("➕ THÊM SẢN PHẨM MỚI");
 
         try {
             Product p = new Product();
@@ -241,7 +238,6 @@ public class ProductUI {
             p.setName(name);
 
             p.setCategoryId(chooseCategory());
-
             p.setStorage(InputUtil.inputString(sc, YELLOW + "Storage: " + RESET));
             p.setColor(InputUtil.inputString(sc, YELLOW + "Color: " + RESET));
 
@@ -255,19 +251,125 @@ public class ProductUI {
 
             if (service.add(p)) {
                 System.out.println(GREEN + "✅ Thêm sản phẩm thành công!" + RESET);
-                categoryMap = null; // refresh cache
+                categoryMap = null;
             } else {
                 System.out.println(RED + "❌ Thêm sản phẩm thất bại!" + RESET);
             }
         } catch (Exception e) {
+            System.out.println(RED + "❌ Lỗi nhập liệu!" + RESET);
+        }
+    }
+
+    // ================= UPDATE - ĐÃ SỬA HOÀN CHỈNH =================
+    private static void update() {
+        clearScreen();
+        printHeader("✏️  CẬP NHẬT SẢN PHẨM");
+
+        try {
+            int id = InputUtil.inputInt(sc, YELLOW + "Nhập ID sản phẩm: " + RESET, 0, 9999);
+
+            Product oldP = service.getAll().stream()
+                    .filter(p -> p.getId() == id)
+                    .findFirst().orElse(null);
+
+            if (oldP == null) {
+                System.out.println(RED + "❌ Không tìm thấy sản phẩm với ID = " + id + "!" + RESET);
+                pause();
+                return;
+            }
+
+            System.out.println(GREEN + "\nThông tin hiện tại:" + RESET);
+            show(List.of(oldP));
+
+            Product newProduct = new Product();
+            newProduct.setId(id);
+
+            System.out.println("\n" + YELLOW + "Nhấn Enter nếu muốn giữ nguyên giá trị cũ:" + RESET);
+
+            // Sử dụng input cho phép rỗng
+            String name = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Tên mới: " + RESET);
+            newProduct.setName(name.isEmpty() ? oldP.getName() : name);
+
+            String catStr = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Category ID mới: " + RESET);
+            newProduct.setCategoryId(catStr.isEmpty() ? oldP.getCategoryId() : Integer.parseInt(catStr));
+
+            String storage = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Storage mới: " + RESET);
+            newProduct.setStorage(storage.isEmpty() ? oldP.getStorage() : storage);
+
+            String color = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Color mới: " + RESET);
+            newProduct.setColor(color.isEmpty() ? oldP.getColor() : color);
+
+            String priceStr = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Giá mới: " + RESET);
+            newProduct.setPrice(priceStr.isEmpty() ? oldP.getPrice() : Double.parseDouble(priceStr));
+
+            String stockStr = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Stock mới: " + RESET);
+            newProduct.setStock(stockStr.isEmpty() ? oldP.getStock() : Integer.parseInt(stockStr));
+
+            String desc = InputUtil.inputStringAllowEmpty(sc, YELLOW + "Mô tả mới: " + RESET);
+            newProduct.setDescription(desc.isEmpty() ? oldP.getDescription() : desc);
+
+            // Hiển thị thông tin sẽ cập nhật
+            System.out.println("\n" + BOLD + GREEN + "Thông tin sau khi cập nhật:" + RESET);
+            show(List.of(newProduct));
+
+            int confirm = InputUtil.inputInt(sc,
+                    BOLD + YELLOW + "Xác nhận cập nhật? (1: Có - 0: Không): " + RESET, 0, 1);
+
+            if (confirm == 1) {
+                if (service.update(newProduct)) {
+                    System.out.println(GREEN + "✅ Cập nhật thành công!" + RESET);
+                    categoryMap = null; // refresh cache
+                } else {
+                    System.out.println(RED + "❌ Cập nhật thất bại!" + RESET);
+                }
+            } else {
+                System.out.println(YELLOW + "🚫 Đã hủy cập nhật." + RESET);
+            }
+
+        } catch (Exception e) {
             System.out.println(RED + "❌ Lỗi nhập liệu! Vui lòng kiểm tra lại." + RESET);
+        }
+    }
+
+    private static void delete() {
+        clearScreen();
+        printHeader("🗑️  XÓA SẢN PHẨM");
+
+        try {
+            int id = InputUtil.inputInt(sc, YELLOW + "Nhập ID sản phẩm cần xóa: " + RESET, 0, 9999);
+
+            Product p = service.getAll().stream()
+                    .filter(prod -> prod.getId() == id)
+                    .findFirst().orElse(null);
+
+            if (p == null) {
+                System.out.println(RED + "❌ Không tìm thấy sản phẩm!" + RESET);
+                pause();
+                return;
+            }
+
+            System.out.println("\nSản phẩm sẽ xóa: " + p.getName());
+            int confirm = InputUtil.inputInt(sc,
+                    BOLD + YELLOW + "Xác nhận xóa? (1: Có - 0: Không): " + RESET, 0, 1);
+
+            if (confirm == 1) {
+                if (service.delete(id)) {
+                    System.out.println(GREEN + "✅ Xóa thành công!" + RESET);
+                } else {
+                    System.out.println(RED + "❌ Xóa thất bại!" + RESET);
+                }
+            } else {
+                System.out.println(YELLOW + "🚫 Đã hủy xóa." + RESET);
+            }
+        } catch (Exception e) {
+            System.out.println(RED + "❌ Lỗi nhập liệu!" + RESET);
         }
     }
 
     // ================= SEARCH =================
     private static void search() {
         clearScreen();
-        printHeader("🔍 TÌM KIẾM SẢN PHẨM     ");
+        printHeader("🔍 TÌM KIẾM SẢN PHẨM");
 
         String keyword = InputUtil.inputName(sc, YELLOW + "Nhập tên sản phẩm: " + RESET);
         List<Product> result = service.search(keyword);
@@ -282,48 +384,6 @@ public class ProductUI {
         List<Product> result = service.getByCategory(catId);
         String catName = getCategoryName(catId);
         showWithSortAndPagination(result, "SẢN PHẨM THUỘC: " + catName);
-    }
-
-    // ================= UPDATE & DELETE (tương tự, đã làm đẹp) =================
-    private static void update() {
-        clearScreen();
-        printHeader("✏️  CẬP NHẬT SẢN PHẨM  ");
-
-        try {
-            int id = InputUtil.inputInt(sc, YELLOW + "Nhập ID sản phẩm: " + RESET, 0, 9999);
-
-            Product oldP = service.getAll().stream()
-                    .filter(p -> p.getId() == id)
-                    .findFirst().orElse(null);
-
-            if (oldP == null) {
-                System.out.println(RED + "❌ Không tìm thấy sản phẩm!" + RESET);
-                return;
-            }
-
-            System.out.println(GREEN + "\nThông tin cũ:" + RESET);
-            show(List.of(oldP));
-
-            // ... (phần nhập dữ liệu mới giữ nguyên logic, chỉ thay input bằng InputUtil và thêm màu)
-            // Tôi rút gọn để code không quá dài, bạn có thể copy logic cũ và thay sc.nextLine() bằng InputUtil
-
-            // Ví dụ:
-            String newName = InputUtil.inputString(sc, YELLOW + "Tên mới (Enter giữ nguyên): " + RESET);
-            // ... tương tự cho các trường khác
-
-            // Sau khi có newProduct, hiển thị và confirm như cũ, chỉ thêm màu sắc.
-
-        } catch (Exception e) {
-            System.out.println(RED + "❌ Lỗi nhập liệu!" + RESET);
-        }
-    }
-
-    private static void delete() {
-        clearScreen();
-        printHeader("🗑️  XÓA SẢN PHẨM");
-
-        // Tương tự update, dùng InputUtil và màu sắc
-        // ...
     }
 
     private static int chooseCategory() {

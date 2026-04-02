@@ -77,4 +77,12 @@ public class InputUtil {
             }
         }
     }
+    /**
+     * Input cho chức năng UPDATE - Cho phép nhấn Enter để giữ nguyên giá trị cũ
+     */
+    public static String inputStringAllowEmpty(Scanner sc, String message) {
+        System.out.print(message);
+        String input = sc.nextLine().trim();
+        return input;   // Cho phép rỗng
+    }
 }
