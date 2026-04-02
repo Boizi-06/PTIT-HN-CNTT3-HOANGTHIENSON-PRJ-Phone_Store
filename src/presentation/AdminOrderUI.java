@@ -9,6 +9,7 @@ import utils.InputUtil;
 import java.util.List;
 import java.util.Scanner;
 
+
 public class AdminOrderUI {
 
     private static final OrderService orderService = new OrderService();
@@ -93,23 +94,16 @@ public class AdminOrderUI {
     private static void updateOrderStatus() {
         printHeader("🔄 CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG");
 
-        List<Order> allOrders = orderService.getAllOrders();
+        List<Order> allOrders = orderService.getAllOrdersWithDetails();
         if (allOrders.isEmpty()) {
             System.out.println(RED + "❌ Chưa có đơn hàng nào để cập nhật." + RESET);
             return;
         }
 
-        // Bảng danh sách ngắn gọn để chọn ID
-        System.out.println(BOLD + "ID     | Ngày tạo           | Trạng thái               | Tổng tiền" + RESET);
-        System.out.println("─".repeat(85));
-        for (Order o : allOrders) {
-            System.out.printf("%-6d | %s | %s | %s\n",
-                    o.getId(),
-                    FormatUtil.formatDate(o.getCreatedAt()),
-                    getStatusDisplayPlain(o.getStatus()),
-                    FormatUtil.formatVND(o.getTotalPrice()));
+
+        for (Order order : allOrders) {
+            printOrderDetail(order);
         }
-        System.out.println("─".repeat(85));
 
         int orderId = InputUtil.inputInt(sc, BOLD + "\nNhập ID đơn hàng cần cập nhật (0 để hủy): " + RESET, 0, 999999);
         if (orderId == 0) return;
@@ -176,38 +170,67 @@ public class AdminOrderUI {
     private static void printOrderDetail(Order order) {
         if (order == null) return;
 
-        System.out.println(BOLD + "╔" + "═".repeat(95) + "╗" + RESET);
-        System.out.printf(BOLD + "║ " + PURPLE + "ĐƠN HÀNG #%d" + RESET
-                        + " | Khách: %-22s | Ngày: %s" + BOLD + " ║\n" + RESET,
-                order.getId(),
-                order.getCustomerName() != null ? order.getCustomerName() : "Khách #" + order.getUserId(),
-                FormatUtil.formatDate(order.getCreatedAt()));
+        final int WIDTH = 85;
 
-        System.out.printf(BOLD + "║ Trạng thái: " + RESET + "%s"
-                        + BOLD + " | Tổng tiền: " + RESET + "%s" + BOLD + " ║\n" + RESET,
-                getStatusDisplay(order.getStatus()),
-                FormatUtil.formatVND(order.getTotalPrice()));
+        printBorderTop(WIDTH);
 
+        // HEADER
+        String header = "ĐƠN #" + order.getId()
+                + " | " + truncate(getCustomer(order), 20)
+                + " | " + FormatUtil.formatDate(order.getCreatedAt());
+
+        printLine(header, WIDTH, true);
+
+        // STATUS
+        String status = "Trạng thái: " + getStatusDisplay(order.getStatus())
+                + " | Tổng: " + FormatUtil.formatVND(order.getTotalPrice());
+
+        printLine(status, WIDTH, false);
+
+        printDivider(WIDTH);
+
+        // TITLE
+        printLine(BLUE + "CHI TIẾT SẢN PHẨM" + RESET, WIDTH, true);
+        printThinDivider(WIDTH);
+
+        // TABLE HEADER
+        printLine(formatRow("Tên sản phẩm", "SL", "Thành tiền"), WIDTH, true);
+
+        // DATA
         List<OrderDetail> details = order.getOrderDetails();
-        if (!details.isEmpty()) {
-            System.out.println(BOLD + "╠" + "═".repeat(95) + "╣" + RESET);
-            System.out.println(BOLD + "║ " + BLUE + "CHI TIẾT SẢN PHẨM" + RESET + BOLD + " ".repeat(78) + "║" + RESET);
-            System.out.println(BOLD + "╠" + "─".repeat(95) + "╣" + RESET);
-            System.out.println(BOLD + "║   " + "Tên sản phẩm" + " ".repeat(28)
-                    + "Số lượng" + " ".repeat(8) + "Thành tiền" + BOLD + " ║" + RESET);
-
+        if (details != null && !details.isEmpty()) {
             for (OrderDetail d : details) {
-                System.out.printf(BOLD + "║   %-35s %-8d %s" + BOLD + " ║\n" + RESET,
-                        truncate(d.getProductName(), 35),
-                        d.getQuantity(),
-                        FormatUtil.formatVND(d.getPrice() * d.getQuantity()));
+                printLine(formatRow(
+                        truncate(d.getProductName(), 40),
+                        String.valueOf(d.getQuantity()),
+                        FormatUtil.formatVND(d.getPrice() * d.getQuantity())
+                ), WIDTH, false);
             }
         } else {
-            System.out.println(BOLD + "║ " + YELLOW + "Không có chi tiết sản phẩm" + BOLD + " ".repeat(68) + "║" + RESET);
+            printLine(YELLOW + "Không có sản phẩm" + RESET, WIDTH, false);
         }
 
-        System.out.println(BOLD + "╚" + "═".repeat(95) + "╝" + RESET);
-        System.out.println();
+        printBorderBottom(WIDTH);
+    }
+
+
+    private static String formatRow(String name, String qty, String price) {
+        return String.format("%-38s %-5s %10s", name, qty, price);
+    }
+
+    private static void printLine(String text, int width, boolean bold) {
+        String plain = stripAnsi(text);
+        int padding = width - plain.length();
+
+        if (padding < 0) {
+            text = truncate(plain, width);
+            padding = 0;
+        }
+
+        String line = "║ " + text + " ".repeat(padding) + " ║";
+
+        if (bold) System.out.println(BOLD + line + RESET);
+        else System.out.println(line);
     }
 
     // ==================== HÀM HỖ TRỢ ====================
@@ -228,6 +251,7 @@ public class AdminOrderUI {
             default          -> status;
         };
     }
+
 
     private static String getStatusDisplayPlain(String status) {
         if (status == null) return "Không xác định";
@@ -255,5 +279,40 @@ public class AdminOrderUI {
             case "DELIVERED", "CANCELLED" -> false;
             default -> false;
         };
+    }
+
+
+
+
+
+
+
+
+    private static void printBorderTop(int w) {
+        System.out.println(BOLD + "╔" + "═".repeat(w) + "╗" + RESET);
+    }
+
+    private static void printBorderBottom(int w) {
+        System.out.println(BOLD + "╚" + "═".repeat(w) + "╝" + RESET);
+        System.out.println();
+    }
+
+    private static void printDivider(int w) {
+        System.out.println(BOLD + "╠" + "═".repeat(w) + "╣" + RESET);
+    }
+
+    private static void printThinDivider(int w) {
+        System.out.println(BOLD + "╠" + "─".repeat(w) + "╣" + RESET);
+    }
+
+
+    private static String getCustomer(Order o) {
+        return o.getCustomerName() != null
+                ? o.getCustomerName()
+                : "Khách #" + o.getUserId();
+    }
+
+    private static String stripAnsi(String text) {
+        return text.replaceAll("\\u001B\\[[;\\d]*m", "");
     }
 }

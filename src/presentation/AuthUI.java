@@ -2,91 +2,128 @@ package presentation;
 
 import business.service.AuthService;
 import entity.User;
+import utils.InputUtil;
+import utils.ValidateUtil;
 
 import java.util.Scanner;
 
 public class AuthUI {
-    private AuthService authService = new AuthService();
-    private Scanner sc = new Scanner(System.in);
+
+    private final AuthService authService = new AuthService();
+    private final Scanner sc = new Scanner(System.in);
+
+    // ==================== MÀU SẮC ANSI ====================
+    private static final String RESET = "\u001B[0m";
+    private static final String BOLD = "\u001B[1m";
+    private static final String CYAN = "\u001B[36m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String RED = "\u001B[31m";
+    private static final String PURPLE = "\u001B[35m";
+    private static final String BLUE = "\u001B[34m";
 
     public void register() {
-        System.out.println("=== REGISTER ===");
+        printAuthHeader("📝 ĐĂNG KÝ TÀI KHOẢN");
 
-        String name;
-        do {
-            System.out.print("Name: ");
-            name = sc.nextLine();
-            if (name.isEmpty()) {
-                System.out.println("❌ Không được để trống!");
-            }
-        } while (name.isEmpty());
+        String name = inputWithValidation("👤 Họ và tên",
+                input -> !input.trim().isEmpty(),
+                "❌ Họ tên không được để trống!");
 
-        // EMAIL
-        String email;
-        do {
-            System.out.print("Email: ");
-            email = sc.nextLine();
-            if (!utils.ValidateUtil.isValidEmail(email)) {
-                System.out.println("❌ Email phải có dạng @gmail.com");
-            }
-        } while (!utils.ValidateUtil.isValidEmail(email));
+        String email = inputWithValidation("📧 Email",
+                ValidateUtil::isValidEmail,
+                "❌ Email phải có dạng @gmail.com!");
 
-        // PASSWORD
-        String password;
-        do {
-            System.out.print("Password: ");
-            password = sc.nextLine();
-            if (!utils.ValidateUtil.isValidPassword(password)) {
-                System.out.println("❌ Password ≥ 8 ký tự và có ít nhất 1 chữ hoa");
-            }
-        } while (!utils.ValidateUtil.isValidPassword(password));
+        // Mật khẩu mới với yêu cầu mạnh hơn
+        String password = inputWithValidation("🔑 Mật khẩu",
+                this::isStrongPassword,
+                "❌ Mật khẩu phải ≥ 8 ký tự, có ít nhất 1 chữ hoa và 1 ký tự đặc biệt!");
 
-        // PHONE
-        String phone;
-        do {
-            System.out.print("Phone: ");
-            phone = sc.nextLine();
-            if (!utils.ValidateUtil.isValidPhone(phone)) {
-                System.out.println("❌ Phone phải là 10 số");
-            }
-        } while (!utils.ValidateUtil.isValidPhone(phone));
+        String phone = inputWithValidation("📱 Số điện thoại",
+                ValidateUtil::isValidPhone,
+                "❌ Số điện thoại phải là 10 số!");
 
-        // ADDRESS
-        String address;
-        do {
-            System.out.print("Address: ");
-            address = sc.nextLine();
-            if (address.isEmpty()) {
-                System.out.println("❌ Không được để trống!");
-            }
-        } while (address.isEmpty());
+        String address = inputWithValidation("🏠 Địa chỉ",
+                input -> !input.trim().isEmpty(),
+                "❌ Địa chỉ không được để trống!");
 
-        User user = new User(name, email, password, phone, address, "CUSTOMER");
+        User newUser = new User(name.trim(), email.trim(), password, phone.trim(), address.trim(), "CUSTOMER");
 
-        if (authService.register(user)) {
-            System.out.println("✅ Đăng ký thành công!");
+        System.out.println("\n" + YELLOW + "Đang xử lý đăng ký..." + RESET);
+        if (authService.register(newUser)) {
+            System.out.println(GREEN + "\n✅ Đăng ký tài khoản thành công!" + RESET);
+            System.out.println(GREEN + "Bạn có thể đăng nhập ngay bây giờ." + RESET);
         } else {
-            System.out.println("❌ Email đã tồn tại!");
+            System.out.println(RED + "\n❌ Đăng ký thất bại! Email này đã tồn tại." + RESET);
         }
     }
 
     public User login() {
-        System.out.println("=== LOGIN ===");
+        printAuthHeader("🔐 ĐĂNG NHẬP");
 
-        System.out.print("Email: ");
-        String email = sc.nextLine();
+        System.out.print(BOLD + "📧 Email: " + RESET);
+        String email = sc.nextLine().trim();
 
-        System.out.print("Password: ");
-        String password = sc.nextLine();
+        System.out.print(BOLD + "🔑 Mật khẩu: " + RESET);
+        String password = sc.nextLine();   // Không trim password
+
+        System.out.println("\n" + YELLOW + "Đang kiểm tra thông tin..." + RESET);
 
         User user = authService.login(email, password);
 
         if (user != null) {
-            System.out.println("Login thành công!");
+            System.out.println(GREEN + "\n✅ Đăng nhập thành công!" + RESET);
+            System.out.println(GREEN + "Chào mừng " + BOLD + user.getName() + RESET + " trở lại!" + RESET);
             return user;
         } else {
-            System.out.println("Sai tài khoản!");
+            System.out.println(RED + "\n❌ Email hoặc mật khẩu không chính xác!" + RESET);
             return null;
         }
+    }
+
+    // ==================== VALIDATE MẬT KHẨU MẠNH ====================
+    private boolean isStrongPassword(String password) {
+        if (password == null || password.length() < 8) {
+            return false;
+        }
+
+        boolean hasUpperCase = false;
+        boolean hasSpecialChar = false;
+
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                hasUpperCase = true;
+            }
+            if (!Character.isLetterOrDigit(c)) {   // Ký tự đặc biệt
+                hasSpecialChar = true;
+            }
+            if (hasUpperCase && hasSpecialChar) {
+                return true;   // Đủ điều kiện thì dừng sớm
+            }
+        }
+
+        return hasUpperCase && hasSpecialChar;
+    }
+
+    // ==================== HÀM HỖ TRỢ NHẬP CÓ KIỂM TRA ====================
+    private String inputWithValidation(String fieldName, java.util.function.Predicate<String> validator, String errorMsg) {
+        String input;
+        while (true) {
+            System.out.print(BOLD + fieldName + ": " + RESET);
+            input = sc.nextLine().trim();
+
+            if (validator.test(input)) {
+                return input;
+            }
+            System.out.println(RED + errorMsg + RESET);
+        }
+    }
+
+    // ==================== HEADER ĐẸP ====================
+    private void printAuthHeader(String title) {
+        System.out.println();
+        System.out.println(BOLD + CYAN + "╔" + "═".repeat(60) + "╗" + RESET);
+        System.out.println(BOLD + CYAN + "║" + " ".repeat(20) + title + " ".repeat(60 - 20 - title.length()) + "║" + RESET);
+        System.out.println(BOLD + CYAN + "╚" + "═".repeat(60) + "╝" + RESET);
+        System.out.println();
     }
 }
